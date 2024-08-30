@@ -1,28 +1,42 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"strconv"
+
+	"snippetbox.kavinddd.net/internal/models"
 )
 
-func home(w http.ResponseWriter, r *http.Request) {
+func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	if r.RequestURI != "/" {
-		http.NotFound(w, r)
+		app.notFound(w)
 		return
 	}
 
-	templates, err := template.ParseFiles(
+	snippets, err := app.snippets.Latest()
+
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	for _, snippet := range snippets {
+		fmt.Fprintf(w, "%+v\n", snippet)
+	}
+
+	files := []string{
 		"./ui/html/base.html",
 		"./ui/html/partials/nav.html",
 		"./ui/html/pages/home.html",
-	)
+	}
+
+	templates, err := template.ParseFiles(files...)
 
 	if err != nil {
-		log.Println(err.Error())
-		http.Error(w, "Internal Server Error", 500)
+		app.serverError(w, err)
 		return
 	}
 
@@ -30,31 +44,57 @@ func home(w http.ResponseWriter, r *http.Request) {
 
 	err = templates.ExecuteTemplate(w, "base", nil)
 	if err != nil {
-		log.Println(err.Error())
-		http.Error(w, "Internal Server Error", 500)
+		app.serverError(w, err)
 		return
 	}
 }
 
-func snippetView(w http.ResponseWriter, r *http.Request) {
+func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 
 	idString := r.URL.Query().Get("id")
 
 	id, err := strconv.Atoi(idString)
 
+	fmt.Println(id)
+
 	if err != nil || id < 1 {
-		http.NotFound(w, r)
+		app.notFound(w)
 		return
 	}
 
-	w.Write([]byte(fmt.Sprintf("Display a specific snippet %s", idString)))
+	snippet, err := app.snippets.Get(id)
+
+	if err != nil {
+
+		if errors.Is(err, models.ErrNoRecord) {
+			app.notFound(w)
+			return
+		}
+
+		app.serverError(w, err)
+		return
+	}
+
+	fmt.Fprint(w, snippet)
 }
 
-func snippetCreate(w http.ResponseWriter, r *http.Request) {
+func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
-		http.Error(w, fmt.Sprintf("Method %s is not allowed", r.Method), http.StatusMethodNotAllowed)
+		app.clientError(w, http.StatusMethodNotAllowed)
 		return
 	}
-	w.Write([]byte("Create a new snippet"))
+
+	content := "O snail\nClimb Mount Fuji, \nBut slowly slowly!\n\n= Kobashi"
+	expires := 7
+
+	id, err := app.snippets.Insert("Test", content, expires)
+
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	app.infoLog.Printf("snippet %d is just created", id)
+	http.Redirect(w, r, fmt.Sprintf("/snippet/view?id=%d", id), http.StatusTemporaryRedirect)
 }
