@@ -14,7 +14,49 @@ type Snippet struct {
 }
 
 type SnippetModel struct {
-	DB *sql.DB
+	DB         *sql.DB
+	InsertStmt *sql.Stmt // example of batch insert
+}
+
+// example of batch insert
+func NewExampleModel(db *sql.DB) (*SnippetModel, error) {
+	insertStmt, err := db.Prepare(`
+		INSERT INTO snippets (title, content, created, expires) 
+		VALUES (?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))
+	`)
+
+	if err != nil {
+		return nil, err
+	}
+	return &SnippetModel{
+		db,
+		insertStmt,
+	}, nil
+}
+
+// example of transaction
+func (m *SnippetModel) TransactionExample() error {
+	tx, err := m.DB.Begin()
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	_, err = tx.Exec("SOME QUERY")
+
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("SOME QUERY")
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *SnippetModel) Insert(title string, content string, expires int) (int, error) {
