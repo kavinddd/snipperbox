@@ -5,16 +5,20 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/julienschmidt/httprouter"
 	"snippetbox.kavinddd.net/internal/models"
 )
 
-type templateData struct {
-	CurrentYear int
-	Snippet     *models.Snippet
-	Snippets    []*models.Snippet
+// a struct represeneting snippet create form
+type sniperCreateForm struct {
+	Title       string
+	Content     string
+	Expires     int
+	FieldErrors map[string]string
 }
 
 func (app *application) newTemplateData() *templateData {
@@ -94,10 +98,58 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 	// 	return
 	// }
 
-	content := "O snail\nClimb Mount Fuji, \nBut slowly slowly!\n\n= Kobashi"
-	expires := 7
+	// by default, r.ParseForm() will return an error if the size of body is reaching 10 MB
+	// you can override the maximum size usiing http.MaxBytesReader(w, r.Body, 4096) bytes (4MB)
+	// http.MaxBytesReader(w, r.Body, 4096)
 
-	id, err := app.snippets.Insert("Test", content, expires)
+	if err := r.ParseForm(); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	expires := r.PostForm.Get("expires")
+	expiresInt, err := strconv.Atoi(expires)
+
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	form := sniperCreateForm{
+		Title:       r.PostForm.Get("title"),
+		Content:     r.PostForm.Get("content"),
+		Expires:     expiresInt,
+		FieldErrors: map[string]string{},
+	}
+
+	// form validation - start
+
+	if strings.TrimSpace(form.Title) == "" {
+		form.FieldErrors["title"] = "This field cannot be blank"
+	}
+
+	if utf8.RuneCountInString(form.Title) > 100 {
+		form.FieldErrors["title"] = "This field cannot be more than 100 characters long"
+	}
+
+	if strings.TrimSpace(form.Content) == "" {
+		form.FieldErrors["content"] = "This field cannot be blank"
+	}
+
+	if expiresInt != 1 && expiresInt != 7 && expiresInt != 365 {
+		form.FieldErrors["expires"] = "This field must equal to 1, 7 or 365"
+	}
+
+	if len(form.FieldErrors) != 0 {
+		data := app.newTemplateData()
+		data.Form = form
+		app.render(w, http.StatusUnprocessableEntity, "create.html", data)
+		return
+	}
+
+	// form validation - end
+
+	id, err := app.snippets.Insert(form.Title, form.Content, expiresInt)
 
 	if err != nil {
 		app.serverError(w, err)
@@ -105,9 +157,18 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 	}
 
 	app.infoLog.Printf("snippet %d is just created", id)
-	http.Redirect(w, r, fmt.Sprintf("/snippet/view?id=%d", id), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther)
 }
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Display the form for creating a new page..."))
+
+	form := sniperCreateForm{
+		Expires: 365,
+	}
+
+	data := app.newTemplateData()
+	data.Form = form
+
+	app.render(w, http.StatusOK, "create.html", data)
+
 }

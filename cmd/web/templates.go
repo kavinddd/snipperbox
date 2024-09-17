@@ -4,7 +4,16 @@ import (
 	"html/template"
 	"path/filepath"
 	"time"
+
+	"snippetbox.kavinddd.net/internal/models"
 )
+
+type templateData struct {
+	CurrentYear int
+	Snippet     *models.Snippet
+	Snippets    []*models.Snippet
+	Form        any
+}
 
 var funcMap template.FuncMap = template.FuncMap{
 	"humanDate": humanDate,
