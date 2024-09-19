@@ -11,14 +11,16 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"snippetbox.kavinddd.net/internal/models"
+	"snippetbox.kavinddd.net/internal/validator"
 )
 
 // a struct represeneting snippet create form
-type sniperCreateForm struct {
-	Title       string
-	Content     string
-	Expires     int
-	FieldErrors map[string]string
+type snippetCreateForm struct {
+	Title   string
+	Content string
+	Expires int
+	validator.Validator
+	// FieldErrors map[string]string
 }
 
 func (app *application) newTemplateData() *templateData {
@@ -115,32 +117,24 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	form := sniperCreateForm{
-		Title:       r.PostForm.Get("title"),
-		Content:     r.PostForm.Get("content"),
-		Expires:     expiresInt,
-		FieldErrors: map[string]string{},
+	form := snippetCreateForm{
+		Title:     r.PostForm.Get("title"),
+		Content:   r.PostForm.Get("content"),
+		Expires:   expiresInt,
+		Validator: validator.Validator{},
 	}
 
 	// form validation - start
 
-	if strings.TrimSpace(form.Title) == "" {
-		form.FieldErrors["title"] = "This field cannot be blank"
-	}
+	form.CheckFields("title", "This field cannot be more than 100 characters long", validator.MaxChars(form.Title, 100))
 
-	if utf8.RuneCountInString(form.Title) > 100 {
-		form.FieldErrors["title"] = "This field cannot be more than 100 characters long"
-	}
+	form.CheckFields("title", "This field cannot be blank", validator.NotBlank(form.Title))
 
-	if strings.TrimSpace(form.Content) == "" {
-		form.FieldErrors["content"] = "This field cannot be blank"
-	}
+	form.CheckFields("content", "This field cannot be blank", validator.NotBlank(form.Content))
 
-	if expiresInt != 1 && expiresInt != 7 && expiresInt != 365 {
-		form.FieldErrors["expires"] = "This field must equal to 1, 7 or 365"
-	}
+	form.CheckFields("expires", "This field must equal to 1, 7 or 365", validator.PermittedInt(form.Expires, []int{1, 7, 365}))
 
-	if len(form.FieldErrors) != 0 {
+	if form.Valid() {
 		data := app.newTemplateData()
 		data.Form = form
 		app.render(w, http.StatusUnprocessableEntity, "create.html", data)
@@ -162,7 +156,7 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
 
-	form := sniperCreateForm{
+	form := snippetCreateForm{
 		Expires: 365,
 	}
 
