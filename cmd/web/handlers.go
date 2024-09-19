@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/julienschmidt/httprouter"
 	"snippetbox.kavinddd.net/internal/models"
@@ -15,12 +13,12 @@ import (
 )
 
 // a struct represeneting snippet create form
+// `form: "key"` to automatically map http form into a struct
 type snippetCreateForm struct {
-	Title   string
-	Content string
-	Expires int
-	validator.Validator
-	// FieldErrors map[string]string
+	Title               string `form: "title"`
+	Content             string `form: "content"`
+	Expires             int    `form: "expires"`
+	validator.Validator `form: "-"`
 }
 
 func (app *application) newTemplateData() *templateData {
@@ -109,19 +107,13 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	expires := r.PostForm.Get("expires")
-	expiresInt, err := strconv.Atoi(expires)
+	form := snippetCreateForm{}
+
+	err := app.formDecoder.Decode(&form, r.PostForm) // formDecoder is a formDecoder:   &form.Decoder{},
 
 	if err != nil {
 		app.clientError(w, http.StatusBadRequest)
 		return
-	}
-
-	form := snippetCreateForm{
-		Title:     r.PostForm.Get("title"),
-		Content:   r.PostForm.Get("content"),
-		Expires:   expiresInt,
-		Validator: validator.Validator{},
 	}
 
 	// form validation - start
@@ -143,7 +135,7 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 
 	// form validation - end
 
-	id, err := app.snippets.Insert(form.Title, form.Content, expiresInt)
+	id, err := app.snippets.Insert(form.Title, form.Content, form.Expires)
 
 	if err != nil {
 		app.serverError(w, err)
