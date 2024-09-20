@@ -102,14 +102,9 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 	// you can override the maximum size usiing http.MaxBytesReader(w, r.Body, 4096) bytes (4MB)
 	// http.MaxBytesReader(w, r.Body, 4096)
 
-	if err := r.ParseForm(); err != nil {
-		app.clientError(w, http.StatusBadRequest)
-		return
-	}
+	var form snippetCreateForm
 
-	form := snippetCreateForm{}
-
-	err := app.formDecoder.Decode(&form, r.PostForm) // formDecoder is a formDecoder:   &form.Decoder{},
+	err := app.decodePostForm(r, &form)
 
 	if err != nil {
 		app.clientError(w, http.StatusBadRequest)
@@ -126,7 +121,7 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 
 	form.CheckFields("expires", "This field must equal to 1, 7 or 365", validator.PermittedInt(form.Expires, []int{1, 7, 365}))
 
-	if form.Valid() {
+	if !form.Valid() {
 		data := app.newTemplateData()
 		data.Form = form
 		app.render(w, http.StatusUnprocessableEntity, "create.html", data)
@@ -143,7 +138,7 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 	}
 
 	app.infoLog.Printf("snippet %d is just created", id)
-	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther) // without htpt.StatusSeeOther, you will get some error
 }
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
