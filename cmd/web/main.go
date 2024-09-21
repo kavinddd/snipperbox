@@ -48,7 +48,7 @@ func main() {
 		infoLog:       infoLog,
 		snippets:      &models.SnippetModel{DB: db},
 		templateCache: templateCache,
-		formDecoder:   &form.Decoder{},
+		formDecoder:   form.NewDecoder(),
 	}
 
 	mux := app.routes()

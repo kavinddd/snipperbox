@@ -15,10 +15,10 @@ import (
 // a struct represeneting snippet create form
 // `form: "key"` to automatically map http form into a struct
 type snippetCreateForm struct {
-	Title               string `form: "title"`
-	Content             string `form: "content"`
-	Expires             int    `form: "expires"`
-	validator.Validator `form: "-"`
+	Title               string `form:"title"`
+	Content             string `form:"content"`
+	Expires             int    `form:"expires"`
+	validator.Validator `form:"-"`
 }
 
 func (app *application) newTemplateData() *templateData {
@@ -103,7 +103,6 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 	// http.MaxBytesReader(w, r.Body, 4096)
 
 	var form snippetCreateForm
-
 	err := app.decodePostForm(r, &form)
 
 	if err != nil {
