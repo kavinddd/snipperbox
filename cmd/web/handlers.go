@@ -21,9 +21,10 @@ type snippetCreateForm struct {
 	validator.Validator `form:"-"`
 }
 
-func (app *application) newTemplateData() *templateData {
+func (app *application) newTemplateData(r *http.Request) *templateData {
 	return &templateData{
 		CurrentYear: time.Now().Year(),
+		Flash:       app.sessionManager.PopString(r.Context(), "flash"),
 	}
 }
 
@@ -44,7 +45,7 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := app.newTemplateData()
+	data := app.newTemplateData(r)
 	data.Snippets = snippets
 
 	app.render(w, http.StatusOK, "home.html", data)
@@ -83,7 +84,7 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := app.newTemplateData()
+	data := app.newTemplateData(r)
 	data.Snippet = snippet
 
 	app.render(w, http.StatusOK, "view.html", data)
@@ -121,7 +122,7 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 	form.CheckFields("expires", "This field must equal to 1, 7 or 365", validator.PermittedInt(form.Expires, []int{1, 7, 365}))
 
 	if !form.Valid() {
-		data := app.newTemplateData()
+		data := app.newTemplateData(r)
 		data.Form = form
 		app.render(w, http.StatusUnprocessableEntity, "create.html", data)
 		return
@@ -136,7 +137,7 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	app.infoLog.Printf("snippet %d is just created", id)
+	app.sessionManager.Put(r.Context(), "flash", "Snippet is sucessfully created!")
 	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%d", id), http.StatusSeeOther) // without htpt.StatusSeeOther, you will get some error
 }
 
@@ -146,7 +147,7 @@ func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
 		Expires: 365,
 	}
 
-	data := app.newTemplateData()
+	data := app.newTemplateData(r)
 	data.Form = form
 
 	app.render(w, http.StatusOK, "create.html", data)
