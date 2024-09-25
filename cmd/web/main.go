@@ -71,7 +71,8 @@ func main() {
 		ErrorLog: errLog,
 	}
 
-	err = server.ListenAndServe()
+	err = server.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
+	// err = server.ListenAndServe()
 	errLog.Fatal(err)
 }
 
